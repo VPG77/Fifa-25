@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Mini FIFA 2D Phaser</title>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.js"></script>
+  <style>
+    body { margin: 0; overflow: hidden; background: #111; }
+    #buttons {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      z-index: 10;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 18px;
+      border: none;
+      border-radius: 5px;
+      background: #1abc9c;
+      color: white;
+      cursor: pointer;
+    }
+    #scoreboard {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: white;
+      font-size: 24px;
+      font-family: Arial, sans-serif;
+      z-index: 10;
+      user-select: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="scoreboard">0 - 0</div>
+  <div id="buttons">
+    <button onclick="playerAction('pass')">Pase</button>
+    <button onclick="playerAction('shoot')">Disparo</button>
+    <button onclick="playerAction('dribble')">Regate</button>
+  </div>
+  <script src="game.js"></script>
+</body>
+</html>
+let player;
+let ball;
+let cursors;
+let otherPlayers = [];
+let score = { team1: 0, team2: 0 };
+const goalLeft = {x: 10, y1: 200, y2: 400};
+const goalRight = {x: 790, y1: 200, y2: 400};
+
+const config = {
+  type: Phaser.AUTO,
+  width: 800,
+  height: 600,
+  backgroundColor: '#4CAF50',
+  physics: {
+    default: 'arcade',
+    arcade: { gravity: { y: 0 }, debug: false }
+  },
+  scene: {
+    preload,
+    create,
+    update
+  }
+};
+
+new Phaser.Game(config);
+
+function preload() {
+  this.load.image('player', 'https://i.imgur.com/Qbl1d7u.png');
+  this.load.image('ball', 'https://i.imgur.com/zsN8xVg.png');
+  this.load.image('opponent', 'https://i.imgur.com/efSwpIH.png');
+}
+
+function create() {
+  player = this.physics.add.sprite(400, 500, 'player').setScale(0.2);
+  player.setCollideWorldBounds(true);
+
+  ball = this.physics.add.sprite(400, 300, 'ball').setScale(0.05);
+  ball.setCollideWorldBounds(true);
+  ball.setBounce(1);
+
+  for(let i=0; i<5; i++) {
+    let x = 100 + i*100;
+    let y = 150;
+    let op = this.physics.add.sprite(x, y, 'opponent').setScale(0.2);
+    op.setCollideWorldBounds(true);
+    otherPlayers.push(op);
+  }
+
+  this.physics.add.collider(player, ball);
+
+  cursors = this.input.keyboard.createCursorKeys();
+
+  otherPlayers.forEach(op => {
+    this.physics.add.collider(op, ball);
+    this.physics.add.collider(op, player);
+  });
+}
+
+function update() {
+  const speed = 200;
+  player.setVelocity(0);
+
+  if (cursors.left.isDown) player.setVelocityX(-speed);
+  if (cursors.right.isDown) player.setVelocityX(speed);
+  if (cursors.up.isDown) player.setVelocityY(-speed);
+  if (cursors.down.isDown) player.setVelocityY(speed);
+
+  otherPlayers.forEach(op => {
+    let dx = ball.x - op.x;
+    let dy = ball.y - op.y;
+    let dist = Math.hypot(dx, dy);
+    if(dist > 20) {
+      op.setVelocity(dx*0.3, dy*0.3);
+    } else {
+      op.setVelocity(0);
+    }
+  });
+
+  checkGoal();
+
+  if(Math.abs(ball.body.velocity.x) < 5) ball.body.velocity.x = 0;
+  if(Math.abs(ball.body.velocity.y) < 5) ball.body.velocity.y = 0;
+}
+
+function playerAction(action) {
+  const dx = ball.x - player.x;
+  const dy = ball.y - player.y;
+  const dist = Math.hypot(dx, dy);
+  if(dist < 60) {
+    switch(action) {
+      case 'pass':
+        ball.setVelocity(dx*2, dy*2);
+        break;
+      case 'shoot':
+        ball.setVelocity(dx*5, dy*5);
+        break;
+      case 'dribble':
+        ball.setVelocity(dx*0.5, dy*0.5);
+        break;
+    }
+  }
+}
+
+function checkGoal() {
+  if(ball.x < goalLeft.x && ball.y > goalLeft.y1 && ball.y < goalLeft.y2) {
+    score.team2++;
+    updateScore();
+    resetPositions();
+  }
+  if(ball.x > goalRight.x && ball.y > goalRight.y1 && ball.y < goalRight.y2) {
+    score.team1++;
+    updateScore();
+    resetPositions();
+  }
+}
+
+function updateScore() {
+  document.getElementById('scoreboard').innerText = `${score.team1} - ${score.team2}`;
+}
+
+function resetPositions() {
+  ball.setPosition(400, 300);
+  ball.setVelocity(0,0);
+  player.setPosition(400, 500);
+  otherPlayers.forEach((op, i) => {
+    op.setPosition(100 + i*100, 150);
+    op.setVelocity(0);
+  });
+}
